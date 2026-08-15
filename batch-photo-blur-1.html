@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>写真をほどよくぼかすだけのアプリ</title>
+<style>
+  :root{
+    --paper: #EDE7D8;
+    --paper-deep: #DFD7C2;
+    --paper-shadow: #C9BEA3;
+    --ink: #211C15;
+    --ink-soft: #55503F;
+    --safelight: #B8272C;
+    --safelight-dim: #7E1B1F;
+    --safelight-glow: rgba(184,39,44,0.16);
+    --line: rgba(33,28,21,0.14);
+    --white-print: #FBF9F3;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system, 'Segoe UI', 'Hiragino Sans', sans-serif;
+    color:var(--ink);
+    background:
+      linear-gradient(var(--line) 1px, transparent 1px) 0 0/40px 40px,
+      linear-gradient(90deg, var(--line) 1px, transparent 1px) 0 0/40px 40px,
+      var(--paper);
+    min-height:100vh;
+    padding: 28px 20px 80px;
+  }
+  .wrap{max-width: 980px; margin: 0 auto;}
+
+  /* Header */
+  .eyebrow{
+    font-family:ui-monospace, 'SFMono-Regular', 'Courier New', monospace;
+    font-size:11px;
+    letter-spacing:0.18em;
+    color:var(--safelight);
+    font-weight:600;
+    margin-bottom:6px;
+  }
+  h1{
+    font-family:Georgia, 'Hiragino Mincho ProN', serif;
+    font-optical-sizing:auto;
+    font-weight:700;
+    font-size:clamp(28px,5vw,44px);
+    margin:0 0 6px;
+    line-height:1.05;
+    letter-spacing:-0.01em;
+  }
+  .sub{
+    font-size:14px;
+    color:var(--ink-soft);
+    max-width:56ch;
+    line-height:1.55;
+    margin-bottom:28px;
+  }
+  .rule{
+    border:none;
+    border-top:1px solid var(--line);
+    margin:22px 0;
+  }
+
+  .privacy-note{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    background: var(--white-print);
+    border:1px solid var(--line);
+    border-left:3px solid var(--safelight);
+    border-radius:2px;
+    padding:12px 14px;
+    margin-bottom:22px;
+    font-size:12.5px;
+    line-height:1.5;
+    color:var(--ink-soft);
+  }
+  .privacy-note svg{
+    width:16px; height:16px;
+    flex:none;
+    margin-top:2px;
+    color:var(--safelight);
+  }
+
+  /* Dropzone */
+  .dropzone{
+    border:1.5px dashed var(--paper-shadow);
+    border-radius:2px;
+    background: var(--white-print);
+    padding: 34px 20px;
+    text-align:center;
+    cursor:pointer;
+    transition: border-color .15s ease, background .15s ease;
+    position:relative;
+  }
+  .dropzone.drag{
+    border-color: var(--safelight);
+    background: #fff;
+    box-shadow: 0 0 0 4px var(--safelight-glow);
+  }
+  .dropzone input{display:none;}
+  .dz-icon{
+    width:34px;height:34px;margin:0 auto 12px;
+    opacity:.55;
+  }
+  .dz-title{font-weight:600; font-size:15px; margin-bottom:4px;}
+  .dz-hint{font-family:ui-monospace, 'SFMono-Regular', 'Courier New', monospace; font-size:11.5px; color:var(--ink-soft); letter-spacing:.02em;}
+
+  /* Aperture control */
+  .control-bar{
+    margin-top:28px;
+    display:flex;
+    align-items:center;
+    gap:26px;
+    flex-wrap:wrap;
+    background: var(--white-print);
+    border:1px solid var(--line);
+    border-radius:2px;
+    padding:20px 24px;
+  }
+  .aperture-dial{
+    position:relative;
+    width:76px; height:76px;
+    flex:none;
+  }
+  .aperture-dial svg{width:100%;height:100%;display:block;}
+  .control-meta{flex:1; min-width:200px;}
+  .control-label{
+    font-family:ui-monospace, 'SFMono-Regular', 'Courier New', monospace;
+    font-size:11px;
+    letter-spacing:.14em;
+    color:var(--ink-soft);
+    margin-bottom:8px;
+    display:flex;
+    justify-content:space-between;
+  }
+  .fstop-readout{
+    font-family:ui-monospace, 'SFMono-Regular', 'Courier New', monospace;
+    color:var(--safelight);
+    font-weight:600;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    width:100%;
+    height:2px;
+    background: var(--line);
+    outline:none;
+    margin: 10px 0 4px;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:16px;height:16px;
+    border-radius:50%;
+    background: var(--safelight);
+    border: 2px solid var(--white-print);
+    box-shadow: 0 0 0 1px var(--safelight);
+    cursor:pointer;
+    margin-top:-1px;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:16px;height:16px;
+    border-radius:50%;
+    background: var(--safelight);
+    border: 2px solid var(--white-print);
+    box-shadow: 0 0 0 1px var(--safelight);
+    cursor:pointer;
+  }
+  .tick-labels{
+    display:flex; justify-content:space-between;
+    font-family:ui-monospace, 'SFMono-Regular', 'Courier New', monospace;
+    font-size:10px; color:var(--ink-soft); opacity:.7;
+  }
+  .count-pill{
+    font-family:ui-monospace, 'SFMono-Regular', 'Courier New', monospace;
+    font-size:11.5px;
+    color:var(--ink-soft);
+    white-space:nowrap;
+  }
+
+  .actions{
+    margin-top:18px;
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+  button{
+    font-family:ui-monospace, 'SFMono-Regular', 'Courier New', monospace;
+    font-size:12px;
+    letter-spacing:.05em;
+    border-radius:2px;
+    cursor:pointer;
+    padding:11px 18px;
+    border:1px solid var(--ink);
+    background:transparent;
+    color:var(--ink);
+    transition: background .15s ease, color .15s ease, transform .05s ease;
+  }
+  button:hover{background:var(--ink); color:var(--paper);}
+  button:active{transform: translateY(1px);}
+  button.primary{
+    background:var(--safelight);
+    border-color:var(--safelight);
+    color:#fff;
+  }
+  button.primary:hover{background:var(--safelight-dim); border-color:var(--safelight-dim);}
+  button:disabled{opacity:.35; cursor:not-allowed; pointer-events:none;}
+  .clear-btn{
+    margin-left:auto;
+    border-color:transparent;
+    color:var(--ink-soft);
+  }
+  .clear-btn:hover{background:transparent; color:var(--safelight); text-decoration:underline;}
+
+  /* Contact sheet grid */
+  .sheet-label{
+    margin-top:34px;
+    font-family:ui-monospace, 'SFMono-Regular', 'Courier New', monospace;
+    font-size:11px;
+    letter-spacing:.14em;
+    color:var(--ink-soft);
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+  }
+  .grid{
+    margin-top:14px;
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(190px,1fr));
+    gap:22px;
+  }
+  .print{
+    background:var(--white-print);
+    padding:10px 10px 14px;
+    border-radius:1px;
+    box-shadow: 0 1px 2px rgba(33,28,21,0.06), 0 8px 18px -12px rgba(33,28,21,0.35);
+    position:relative;
+    transition: transform .15s ease;
+  }
+  .print:nth-child(3n+1){transform: rotate(-0.6deg);}
+  .print:nth-child(3n+2){transform: rotate(0.5deg);}
+  .print:nth-child(3n){transform: rotate(-0.3deg);}
+  .print:hover{transform: rotate(0deg) translateY(-2px);}
+  .clip{
+    position:absolute; top:-9px; left:50%; transform:translateX(-50%);
+    width:26px; height:14px;
+  }
+  .print canvas{
+    width:100%;
+    display:block;
+    background:#000;
+    aspect-ratio: 1/1;
+    object-fit:cover;
+  }
+  .print-canvas-wrap{overflow:hidden;}
+  .print-foot{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:9px;
+  }
+  .print-name{
+    font-family:ui-monospace, 'SFMono-Regular', 'Courier New', monospace;
+    font-size:10.5px;
+    color:var(--ink-soft);
+    max-width:110px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .print-btns{display:flex; gap:6px;}
+  .icon-btn{
+    border:none;
+    background:none;
+    padding:3px;
+    cursor:pointer;
+    color:var(--ink-soft);
+    display:flex;
+  }
+  .icon-btn:hover{color:var(--safelight);}
+  .icon-btn svg{width:15px; height:15px;}
+
+  .empty-note{
+    margin-top:14px;
+    font-family:ui-monospace, 'SFMono-Regular', 'Courier New', monospace;
+    font-size:12px;
+    color:var(--ink-soft);
+    opacity:.7;
+  }
+
+  @media (max-width:520px){
+    .control-bar{flex-direction:column; align-items:flex-start;}
+    .aperture-dial{margin:0 auto;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">DARKROOM — BATCH TOOL</div>
+  <h1>写真をほどよくぼかすだけのアプリ</h1>
+  <div class="sub">写真を複数枚まとめて読み込み、1つの絞りリングでぼかし量を一括調整。仕上がったらまとめて書き出せます。</div>
+
+  <div class="privacy-note">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l7 3v6c0 4.5-3 8-7 9-4-1-7-4.5-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>
+    <span>写真はこの端末・ブラウザ内だけで処理されます。サーバーやインターネットへは送信されません。外部通信は一切行いません。</span>
+  </div>
+
+  <div class="dropzone" id="dropzone">
+    <input type="file" id="fileInput" accept="image/*" multiple>
+    <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+      <rect x="3" y="5" width="18" height="14" rx="1"></rect>
+      <circle cx="9" cy="11" r="2.2"></circle>
+      <path d="M21 16l-5.2-5-4 4-2-2L3 18"></path>
+    </svg>
+    <div class="dz-title">写真をドラッグ&ドロップ、またはクリックして選択</div>
+    <div class="dz-hint">複数選択可 — JPG / PNG / WEBP</div>
+  </div>
+
+  <div class="control-bar" id="controlBar" style="display:none;">
+    <div class="aperture-dial">
+      <svg viewBox="0 0 100 100" id="apertureSvg">
+        <circle cx="50" cy="50" r="47" fill="none" stroke="var(--line)" stroke-width="1.5"/>
+        <g id="blades"></g>
+        <circle cx="50" cy="50" r="47" fill="none" stroke="var(--paper-shadow)" stroke-width="1"/>
+      </svg>
+    </div>
+    <div class="control-meta">
+      <div class="control-label">
+        <span>絞り（ぼかし量）</span>
+        <span class="fstop-readout" id="fstopReadout">f/22</span>
+      </div>
+      <input type="range" id="blurSlider" min="0" max="40" value="0" step="1">
+      <div class="tick-labels"><span>くっきり</span><span>強くぼかす</span></div>
+    </div>
+    <div class="count-pill" id="countPill">0 枚読み込み済み</div>
+  </div>
+
+  <div class="actions" id="actionsBar" style="display:none;">
+    <button class="primary" id="downloadAllBtn">すべてダウンロード</button>
+    <button id="addMoreBtn">写真を追加</button>
+    <button class="clear-btn" id="clearBtn">すべて削除</button>
+  </div>
+
+  <div class="sheet-label" id="sheetLabel" style="display:none;">
+    <span>CONTACT SHEET</span>
+    <span id="sheetCount"></span>
+  </div>
+  <div class="grid" id="grid"></div>
+  <div class="empty-note" id="emptyNote">まだ写真がありません。上のエリアから読み込んでください。</div>
+</div>
+
+<script>
+const MAX_DIM = 1600; // cap processing resolution for performance
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const grid = document.getElementById('grid');
+const controlBar = document.getElementById('controlBar');
+const actionsBar = document.getElementById('actionsBar');
+const sheetLabel = document.getElementById('sheetLabel');
+const sheetCount = document.getElementById('sheetCount');
+const emptyNote = document.getElementById('emptyNote');
+const blurSlider = document.getElementById('blurSlider');
+const fstopReadout = document.getElementById('fstopReadout');
+const countPill = document.getElementById('countPill');
+const bladesGroup = document.getElementById('blades');
+
+let items = []; // {id, name, sourceCanvas, w, h, previewCanvas}
+let idSeq = 0;
+let currentBlur = 0;
+
+// ---- aperture dial (SVG blades) ----
+function drawBlades(t){
+  // t: 0 (wide open / max blur) .. 1 (closed / no blur)
+  bladesGroup.innerHTML = '';
+  const n = 7, cx = 50, cy = 50, R = 44;
+  const openness = 1 - t; // 0 closed .. 1 open — invert for visual: more blur -> wider opening
+  const innerR = 6 + (R-10) * (1 - openness); // higher openness -> smaller innerR (more open)
+  for(let i=0;i<n;i++){
+    const angle = (i/n) * Math.PI*2;
+    const a1 = angle;
+    const a2 = angle + (Math.PI*2/n);
+    const p1 = polar(cx,cy,R,a1);
+    const p2 = polar(cx,cy,R,a2);
+    const p3 = polar(cx,cy,innerR,a2 - 0.35);
+    const p4 = polar(cx,cy,innerR,a1 - 0.35);
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', `M ${p1.x} ${p1.y} A ${R} ${R} 0 0 1 ${p2.x} ${p2.y} L ${p3.x} ${p3.y} A ${innerR} ${innerR} 0 0 0 ${p4.x} ${p4.y} Z`);
+    path.setAttribute('fill', '#211C15');
+    path.setAttribute('opacity', '0.85');
+    bladesGroup.appendChild(path);
+  }
+}
+function polar(cx,cy,r,a){ return {x: cx + r*Math.cos(a), y: cy + r*Math.sin(a)}; }
+drawBlades(1);
+
+function updateFstopReadout(px){
+  // map 0..40 -> f/22 .. f/1.4 (fake but thematically coherent)
+  const stops = [22,16,11,8,5.6,4,2.8,2,1.4];
+  const idx = Math.min(stops.length-1, Math.round((px/40) * (stops.length-1)));
+  fstopReadout.textContent = 'f/' + stops[idx];
+  drawBlades(px/40);
+}
+updateFstopReadout(0);
+
+// ---- file handling ----
+['dragenter','dragover'].forEach(evt=>{
+  dropzone.addEventListener(evt, e=>{ e.preventDefault(); dropzone.classList.add('drag'); });
+});
+['dragleave','drop'].forEach(evt=>{
+  dropzone.addEventListener(evt, e=>{ e.preventDefault(); dropzone.classList.remove('drag'); });
+});
+dropzone.addEventListener('drop', e=>{
+  const files = Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith('image/'));
+  handleFiles(files);
+});
+dropzone.addEventListener('click', ()=> fileInput.click());
+fileInput.addEventListener('change', e=> { handleFiles(Array.from(e.target.files)); fileInput.value=''; });
+
+document.getElementById('addMoreBtn').addEventListener('click', ()=> fileInput.click());
+document.getElementById('clearBtn').addEventListener('click', ()=>{
+  items = [];
+  renderGrid();
+  syncVisibility();
+});
+
+async function handleFiles(files){
+  for(const file of files){
+    try{
+      const item = await loadItem(file);
+      items.push(item);
+    }catch(err){ console.error('画像の読み込みに失敗:', err); }
+  }
+  renderGrid();
+  syncVisibility();
+}
+
+function loadItem(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let w = img.naturalWidth, h = img.naturalHeight;
+        const scale = Math.min(1, MAX_DIM / Math.max(w,h));
+        w = Math.round(w*scale); h = Math.round(h*scale);
+        const src = document.createElement('canvas');
+        src.width = w; src.height = h;
+        src.getContext('2d').drawImage(img, 0, 0, w, h);
+        const baseName = file.name.replace(/\.[^.]+$/, '') || 'photo';
+        resolve({ id: idSeq++, name: baseName, sourceCanvas: src, w, h });
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function syncVisibility(){
+  const has = items.length > 0;
+  controlBar.style.display = has ? 'flex' : 'none';
+  actionsBar.style.display = has ? 'flex' : 'none';
+  sheetLabel.style.display = has ? 'flex' : 'none';
+  emptyNote.style.display = has ? 'none' : 'block';
+  countPill.textContent = items.length + ' 枚読み込み済み';
+  sheetCount.textContent = items.length + ' EXPOSURES';
+}
+
+function renderGrid(){
+  grid.innerHTML = '';
+  items.forEach(item=>{
+    const print = document.createElement('div');
+    print.className = 'print';
+
+    const clip = document.createElementNS('http://www.w3.org/2000/svg','svg');
+    clip.setAttribute('class','clip');
+    clip.setAttribute('viewBox','0 0 26 14');
+    clip.innerHTML = `<rect x="9" y="0" width="8" height="6" rx="1" fill="var(--paper-shadow)"/><rect x="2" y="5" width="22" height="6" rx="2" fill="var(--ink-soft)"/>`;
+    print.appendChild(clip);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'print-canvas-wrap';
+    const canvas = document.createElement('canvas');
+    canvas.width = item.w; canvas.height = item.h;
+    wrap.appendChild(canvas);
+    print.appendChild(wrap);
+    item.previewCanvas = canvas;
+
+    const foot = document.createElement('div');
+    foot.className = 'print-foot';
+    const name = document.createElement('div');
+    name.className = 'print-name';
+    name.textContent = item.name;
+    const btns = document.createElement('div');
+    btns.className = 'print-btns';
+
+    const dlBtn = document.createElement('button');
+    dlBtn.className = 'icon-btn';
+    dlBtn.title = 'ダウンロード';
+    dlBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12"/><path d="M6 11l6 6 6-6"/><path d="M4 21h16"/></svg>`;
+    dlBtn.addEventListener('click', ()=> downloadItem(item));
+
+    const rmBtn = document.createElement('button');
+    rmBtn.className = 'icon-btn';
+    rmBtn.title = '削除';
+    rmBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 6h16"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>`;
+    rmBtn.addEventListener('click', ()=>{
+      items = items.filter(i=>i.id!==item.id);
+      renderGrid();
+      syncVisibility();
+    });
+
+    btns.appendChild(dlBtn);
+    btns.appendChild(rmBtn);
+    foot.appendChild(name);
+    foot.appendChild(btns);
+    print.appendChild(foot);
+
+    grid.appendChild(print);
+    paintPreview(item, currentBlur);
+  });
+}
+
+function paintPreview(item, blurPx){
+  const ctx = item.previewCanvas.getContext('2d');
+  ctx.clearRect(0,0,item.w,item.h);
+  ctx.filter = blurPx > 0 ? `blur(${blurPx}px)` : 'none';
+  ctx.drawImage(item.sourceCanvas, 0, 0);
+  ctx.filter = 'none';
+}
+
+blurSlider.addEventListener('input', ()=>{
+  currentBlur = parseInt(blurSlider.value, 10);
+  updateFstopReadout(currentBlur);
+  items.forEach(item => paintPreview(item, currentBlur));
+});
+
+function downloadItem(item){
+  item.previewCanvas.toBlob(blob=>{
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${item.name}-blur${currentBlur}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=> URL.revokeObjectURL(url), 2000);
+  }, 'image/png');
+}
+
+document.getElementById('downloadAllBtn').addEventListener('click', ()=>{
+  items.forEach((item, i)=>{
+    setTimeout(()=> downloadItem(item), i * 260);
+  });
+});
+
+syncVisibility();
+</script>
+</body>
+</html>
